@@ -13,3 +13,63 @@ Command-line arguments:  -os linux -ws gtk -arch x86_64
 
 !ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2021-11-12 18:35:24.317
 !MESSAGE Started RMI Server, listening on port 41338
+!SESSION 2021-11-22 18:01:51.118 -----------------------------------------------
+eclipse.buildId=Version 1.7.0
+java.version=11.0.10
+java.vendor=AdoptOpenJDK
+BootLoader constants: OS=linux, ARCH=x86_64, WS=gtk, NL=en_US
+Framework arguments:  /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/Linear_Actuator_Project_IRC.ioc
+Command-line arguments:  -os linux -ws gtk -arch x86_64 /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/Linear_Actuator_Project_IRC.ioc
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 4 4 2021-11-22 18:01:56.636
+!MESSAGE CubeMX plugin appears to be active, Log4j initialization might be too late.
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2021-11-22 18:01:56.727
+!MESSAGE Log4j initialized with config file /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/.metadata/.log4j.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2021-11-22 18:02:00.859
+!MESSAGE Started RMI Server, listening on port 41337
+
+!ENTRY org.eclipse.core.resources 4 77 2021-11-22 18:04:01.913
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2021-11-22 18:04:01.913
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2021-11-22 18:04:01.913
+!MESSAGE /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/CM4 overlaps the location of another project: 'CM4'
+
+!ENTRY org.eclipse.core.resources 4 77 2021-11-22 18:04:01.992
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2021-11-22 18:04:01.992
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2021-11-22 18:04:01.992
+!MESSAGE /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/CM7 overlaps the location of another project: 'CM7'
+!SESSION 2021-11-22 18:04:16.043 -----------------------------------------------
+eclipse.buildId=Version 1.7.0
+java.version=11.0.10
+java.vendor=AdoptOpenJDK
+BootLoader constants: OS=linux, ARCH=x86_64, WS=gtk, NL=en_US
+Framework arguments:  /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/.project
+Command-line arguments:  -os linux -ws gtk -arch x86_64 /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/.project
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 4 4 2021-11-22 18:04:21.494
+!MESSAGE CubeMX plugin appears to be active, Log4j initialization might be too late.
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2021-11-22 18:04:21.572
+!MESSAGE Log4j initialized with config file /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/.metadata/.log4j.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2021-11-22 18:04:25.593
+!MESSAGE Started RMI Server, listening on port 41337
+
+!ENTRY org.eclipse.core.resources 4 77 2021-11-22 18:04:25.594
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2021-11-22 18:04:25.594
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2021-11-22 18:04:25.594
+!MESSAGE /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/CM4 overlaps the location of another project: 'CM4'
+
+!ENTRY org.eclipse.core.resources 4 77 2021-11-22 18:04:25.734
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2021-11-22 18:04:25.736
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2021-11-22 18:04:25.736
+!MESSAGE /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/CM7 overlaps the location of another project: 'CM7'

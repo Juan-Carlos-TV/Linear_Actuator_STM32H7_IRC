@@ -400,15 +400,15 @@ static void MX_TIM2_Init(void)
   htim2.Init.Period = 4294967295;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI1;
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC1Filter = 10;
+  sConfig.IC1Filter = 0;
   sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC2Filter = 10;
+  sConfig.IC2Filter = 0;
   if (HAL_TIM_Encoder_Init(&htim2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -596,13 +596,14 @@ void StartTask1(void *argument)
   /* USER CODE BEGIN 5 */
 	  uint8_t MSG[50] = {'\0'};
 	  uint32_t steps;
+	  float cm;
 	  HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
 	  /* Infinite loop */
 	  for(;;)
 	  {
 		steps =  __HAL_TIM_GET_COUNTER(&htim2);
-		sprintf(MSG, "Encoder Ticks = %d\n\r", steps);
-		osMessageQueuePut(positionQueueHandle, &steps, 4, 50);
+		cm=steps*0.4/497;
+		sprintf(MSG, "Centimeters = %f\n\r", cm);
 		HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 100);
 	    osDelay(5);
 	  }

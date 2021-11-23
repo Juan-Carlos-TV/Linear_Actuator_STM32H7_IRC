@@ -363,3 +363,11 @@
 2021-11-12 18:39:20,542 [ERROR] LogOutputStream:74 - [STDERR_REDIRECT] 	at org.eclipse.equinox.launcher.Main.basicRun(Main.java:590)
 2021-11-12 18:39:20,542 [ERROR] LogOutputStream:74 - [STDERR_REDIRECT] 	at org.eclipse.equinox.launcher.Main.run(Main.java:1461)
 2021-11-12 18:39:20,542 [ERROR] LogOutputStream:74 - [STDERR_REDIRECT] 	at org.eclipse.equinox.launcher.Main.main(Main.java:1434)
+2021-11-22 18:01:56,729 [INFO] Activator:177 - 
+
+
+2021-11-22 18:01:56,732 [INFO] Activator:178 - !SESSION log4j initialized
+2021-11-22 18:04:21,574 [INFO] Activator:177 - 
+
+
+2021-11-22 18:04:21,576 [INFO] Activator:178 - !SESSION log4j initialized
