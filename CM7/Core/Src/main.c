@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                             www.st.com/SLA0044
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under Ultimate Liberty license
+ * SLA0044, the "License"; You may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at:
+ *                             www.st.com/SLA0044
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -33,6 +33,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define forwardPWM TIM_CHANNEL_3
+#define reversePWM TIM_CHANNEL_4
 
 #ifndef HSEM_ID_0
 #define HSEM_ID_0 (0U) /* HW semaphore 0*/
@@ -139,7 +141,8 @@ void StartCanRxTask(void *argument);
 void StartCanTxTask(void *argument);
 
 /* USER CODE BEGIN PFP */
-
+void GoHome(void);
+void setPWM(TIM_HandleTypeDef, uint32_t, uint16_t, uint16_t);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -157,17 +160,17 @@ int main(void)
 
   /* USER CODE END 1 */
 /* USER CODE BEGIN Boot_Mode_Sequence_0 */
-  int32_t timeout;
+	int32_t timeout;
 /* USER CODE END Boot_Mode_Sequence_0 */
 
 /* USER CODE BEGIN Boot_Mode_Sequence_1 */
-  /* Wait until CPU2 boots and enters in stop mode or timeout*/
-  timeout = 0xFFFF;
-  while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) != RESET) && (timeout-- > 0));
-  if ( timeout < 0 )
-  {
-  Error_Handler();
-  }
+	/* Wait until CPU2 boots and enters in stop mode or timeout*/
+	timeout = 0xFFFF;
+	while ((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) != RESET) && (timeout-- > 0))
+		;
+	if (timeout < 0) {
+		Error_Handler();
+	}
 /* USER CODE END Boot_Mode_Sequence_1 */
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -181,21 +184,21 @@ int main(void)
   /* Configure the system clock */
   SystemClock_Config();
 /* USER CODE BEGIN Boot_Mode_Sequence_2 */
-/* When system initialization is finished, Cortex-M7 will release Cortex-M4 by means of
-HSEM notification */
-/*HW semaphore Clock enable*/
-__HAL_RCC_HSEM_CLK_ENABLE();
-/*Take HSEM */
-HAL_HSEM_FastTake(HSEM_ID_0);
-/*Release HSEM in order to notify the CPU2(CM4)*/
-HAL_HSEM_Release(HSEM_ID_0,0);
-/* wait until CPU2 wakes up from stop mode */
-timeout = 0xFFFF;
-while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) == RESET) && (timeout-- > 0));
-if ( timeout < 0 )
-{
-Error_Handler();
-}
+	/* When system initialization is finished, Cortex-M7 will release Cortex-M4 by means of
+	 HSEM notification */
+	/*HW semaphore Clock enable*/
+	__HAL_RCC_HSEM_CLK_ENABLE();
+	/*Take HSEM */
+	HAL_HSEM_FastTake(HSEM_ID_0);
+	/*Release HSEM in order to notify the CPU2(CM4)*/
+	HAL_HSEM_Release(HSEM_ID_0, 0);
+	/* wait until CPU2 wakes up from stop mode */
+	timeout = 0xFFFF;
+	while ((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) == RESET) && (timeout-- > 0))
+		;
+	if (timeout < 0) {
+		Error_Handler();
+	}
 /* USER CODE END Boot_Mode_Sequence_2 */
 
   /* USER CODE BEGIN SysInit */
@@ -210,22 +213,22 @@ Error_Handler();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
-
+  GoHome();
   /* USER CODE END 2 */
 
   /* Init scheduler */
   osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
+	/* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
+	/* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
+	/* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
   /* Create the queue(s) */
@@ -248,7 +251,7 @@ Error_Handler();
   interCanQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &interCanQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+	/* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -268,11 +271,11 @@ Error_Handler();
   canTxTaskHandle = osThreadNew(StartCanTxTask, NULL, &canTxTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+	/* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
+	/* add events, ... */
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
@@ -281,12 +284,11 @@ Error_Handler();
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+	while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+	}
   /* USER CODE END 3 */
 }
 
@@ -598,6 +600,7 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -616,6 +619,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : Button1_Pin Button2_Pin */
+  GPIO_InitStruct.Pin = Button1_Pin|Button2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : Limit_Switch_Pin */
+  GPIO_InitStruct.Pin = Limit_Switch_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(Limit_Switch_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pins : LD1_Pin LD3_Pin */
   GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -633,96 +648,178 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void GoHome(void) {
+	//Deten el encoder
+	HAL_TIM_Encoder_Stop(&htim2, TIM_CHANNEL_ALL);
 
+	uint8_t MSG[50] = { '\0' };
+	sprintf(MSG, "Limit Switch pressed\n");
+
+	//Pon el motor en reversa
+	setPWM(htim3, reversePWM, 255, 255);
+	setPWM(htim3, forwardPWM, 255, 0);
+
+	//Espera a que el switch se presione
+	while (HAL_GPIO_ReadPin(Limit_Switch_GPIO_Port, Limit_Switch_Pin));
+
+	HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 100);
+
+	//Hacer que el motor se mueve en reversa 2cm
+	setPWM(htim3, reversePWM, 255, 0);
+	setPWM(htim3, forwardPWM, 255, 255);
+	int32_t steps;
+	float cm = 0;
+	HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
+	//Pon valor del encoder en 0
+	__HAL_TIM_SET_COUNTER(&htim2, 0);
+	while (cm < 2) {
+		steps = __HAL_TIM_GET_COUNTER(&htim2);
+		cm = steps * 0.4 / 497;
+		sprintf(MSG, "Centimeters = %f\n\r    ", cm);
+		HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 40);
+	}
+	//volver a poner el valor del encoder en 0
+	setPWM(htim3, reversePWM, 255, 0);
+	setPWM(htim3, forwardPWM, 255, 0);
+	__HAL_TIM_SET_COUNTER(&htim2, 0);
+
+}
+
+void setPWM(TIM_HandleTypeDef timer, uint32_t channel, uint16_t period, uint16_t pulse) {
+	HAL_TIM_PWM_Stop(&timer, channel); // stop generation of pwm
+	TIM_OC_InitTypeDef sConfigOC;
+	timer.Init.Period = period; // set the period duration
+	HAL_TIM_PWM_Init(&timer); // reinititialise with new period value
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+	sConfigOC.Pulse = pulse; // set the pulse duration
+	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+	HAL_TIM_PWM_ConfigChannel(&timer, &sConfigOC, channel);
+	HAL_TIM_PWM_Start(&timer, channel); // start pwm generation
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartEncoderTask */
 /**
-  * @brief  Function implementing the readEncoderTask thread.
-  * @param  argument: Not used
-  * @retval None
-  */
+ * @brief  Function implementing the readEncoderTask thread.
+ * @param  argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartEncoderTask */
 void StartEncoderTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	uint8_t MSG[50] = { '\0' };
+	int32_t steps=0;
+	int32_t mm=0;
+	uint8_t ret[4] = { '\0' };
+	//HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
+	/* Infinite loop */
+	for (;;) {
+
+		steps = __HAL_TIM_GET_COUNTER(&htim2);
+		mm = steps * 4 / 497;
+		sprintf(MSG, "Milimeters = %d\n\r    ", mm);
+		HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 100);
+		itoa(mm, ret,10);
+		osMessageQueuePut(positionControlQueueHandle, ret, 5, 100);
+		osDelay(20);
+	}
   /* USER CODE END 5 */
 }
 
 /* USER CODE BEGIN Header_StartControlTask */
 /**
-* @brief Function implementing the controlTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the controlTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartControlTask */
 void StartControlTask(void *argument)
 {
   /* USER CODE BEGIN StartControlTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	uint8_t desPos[4] = { "\0" };
+	uint8_t pos[4] = { "\0" };
+	float num1=0;
+	int num2=0;
+	/* Infinite loop */
+	for (;;) {
+		osMessageQueueGet(positionControlQueueHandle, &pos, 5, 100);
+		osMessageQueueGet(positionCanQueueHandle, &desPos, 5, 100);
+		num1 = atoi(pos);
+		num2 = atoi(desPos)*10;
+		if(num1>num2+1){
+			setPWM(htim3, reversePWM, 255, 255);
+			setPWM(htim3, forwardPWM, 255, 0);
+		}else if(num1<num2-1){
+			setPWM(htim3, reversePWM, 255, 0);
+			setPWM(htim3, forwardPWM, 255, 255);
+		}else{
+			setPWM(htim3, reversePWM, 255, 0);
+			setPWM(htim3, forwardPWM, 255, 0);
+		}
+		osDelay(20);
+	}
   /* USER CODE END StartControlTask */
 }
 
 /* USER CODE BEGIN Header_StartDiagnosisTask */
 /**
-* @brief Function implementing the diagnosisTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the diagnosisTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartDiagnosisTask */
 void StartDiagnosisTask(void *argument)
 {
   /* USER CODE BEGIN StartDiagnosisTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	/* Infinite loop */
+	for (;;) {
+		osDelay(1);
+	}
   /* USER CODE END StartDiagnosisTask */
 }
 
 /* USER CODE BEGIN Header_StartCanRxTask */
 /**
-* @brief Function implementing the canRxTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the canRxTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartCanRxTask */
 void StartCanRxTask(void *argument)
 {
   /* USER CODE BEGIN StartCanRxTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	uint8_t pb[4]= { "\0" };
+	/* Infinite loop */
+
+	for (;;) {
+		if(HAL_GPIO_ReadPin(Button1_GPIO_Port, Button1_Pin)){
+			itoa(100,pb,10);
+		}else if(HAL_GPIO_ReadPin(Button2_GPIO_Port, Button2_Pin)){
+			itoa(200,pb,10);
+		}
+		osMessageQueuePut(positionCanQueueHandle, pb, 5, 100);
+
+		osDelay(20);
+	}
   /* USER CODE END StartCanRxTask */
 }
 
 /* USER CODE BEGIN Header_StartCanTxTask */
 /**
-* @brief Function implementing the canTxTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the canTxTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartCanTxTask */
 void StartCanTxTask(void *argument)
 {
   /* USER CODE BEGIN StartCanTxTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	/* Infinite loop */
+	for (;;) {
+		osDelay(1);
+	}
   /* USER CODE END StartCanTxTask */
 }
 
@@ -733,11 +830,10 @@ void StartCanTxTask(void *argument)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1) {
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 

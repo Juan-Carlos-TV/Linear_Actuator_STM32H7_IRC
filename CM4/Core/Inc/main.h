@@ -64,7 +64,8 @@ void Error_Handler(void);
 #define STLINK_TX_GPIO_Port GPIOD
 void   MX_USART3_UART_Init(void);
 /* USER CODE BEGIN Private defines */
-
+#define Limit_Switch_Pin GPIO_PIN_3
+#define Limit_Switch_GPIO_Port GPIOA
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
