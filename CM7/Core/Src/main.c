@@ -69,28 +69,28 @@ osThreadId_t controlTaskHandle;
 const osThreadAttr_t controlTask_attributes = {
   .name = "controlTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityBelowNormal,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for diagnosisTask */
 osThreadId_t diagnosisTaskHandle;
 const osThreadAttr_t diagnosisTask_attributes = {
   .name = "diagnosisTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for canRxTask */
 osThreadId_t canRxTaskHandle;
 const osThreadAttr_t canRxTask_attributes = {
   .name = "canRxTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for canTxTask */
 osThreadId_t canTxTaskHandle;
 const osThreadAttr_t canTxTask_attributes = {
   .name = "canTxTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for positionControlQueue */
 osMessageQueueId_t positionControlQueueHandle;
@@ -711,7 +711,7 @@ void StartEncoderTask(void *argument)
   /* USER CODE BEGIN 5 */
 	uint8_t MSG[50] = { '\0' };
 	int32_t steps=0;
-	int32_t mm=0;
+	int16_t mm=0;
 	uint8_t ret[4] = { '\0' };
 	//HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
 	/* Infinite loop */
@@ -721,8 +721,7 @@ void StartEncoderTask(void *argument)
 		mm = steps * 4 / 497;
 		sprintf(MSG, "Milimeters = %d\n\r    ", mm);
 		HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 100);
-		itoa(mm, ret,10);
-		osMessageQueuePut(positionControlQueueHandle, ret, 5, 100);
+		osMessageQueuePut(positionControlQueueHandle, mm, 5, 100);
 		osDelay(20);
 	}
   /* USER CODE END 5 */
@@ -740,14 +739,14 @@ void StartControlTask(void *argument)
   /* USER CODE BEGIN StartControlTask */
 	uint8_t desPos[4] = { "\0" };
 	uint8_t pos[4] = { "\0" };
-	float num1=0;
-	int num2=0;
+	uint16_t num1=0;
+	uint16_t num2=0;
 	/* Infinite loop */
 	for (;;) {
 		osMessageQueueGet(positionControlQueueHandle, &pos, 5, 100);
 		osMessageQueueGet(positionCanQueueHandle, &desPos, 5, 100);
 		num1 = atoi(pos);
-		num2 = atoi(desPos)*10;
+		num2 = atoi(desPos);
 		if(num1>num2+1){
 			setPWM(htim3, reversePWM, 255, 255);
 			setPWM(htim3, forwardPWM, 255, 0);
@@ -790,14 +789,14 @@ void StartDiagnosisTask(void *argument)
 void StartCanRxTask(void *argument)
 {
   /* USER CODE BEGIN StartCanRxTask */
-	uint8_t pb[4]= { "\0" };
+	uint16_t pb = {0};
 	/* Infinite loop */
 
 	for (;;) {
 		if(HAL_GPIO_ReadPin(Button1_GPIO_Port, Button1_Pin)){
-			itoa(100,pb,10);
+			pb = 100;
 		}else if(HAL_GPIO_ReadPin(Button2_GPIO_Port, Button2_Pin)){
-			itoa(200,pb,10);
+			pb = 200;
 		}
 		osMessageQueuePut(positionCanQueueHandle, pb, 5, 100);
 
