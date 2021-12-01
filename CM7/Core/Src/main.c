@@ -69,28 +69,28 @@ osThreadId_t controlTaskHandle;
 const osThreadAttr_t controlTask_attributes = {
   .name = "controlTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityBelowNormal,
 };
 /* Definitions for diagnosisTask */
 osThreadId_t diagnosisTaskHandle;
 const osThreadAttr_t diagnosisTask_attributes = {
   .name = "diagnosisTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for canRxTask */
 osThreadId_t canRxTaskHandle;
 const osThreadAttr_t canRxTask_attributes = {
   .name = "canRxTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for canTxTask */
 osThreadId_t canTxTaskHandle;
 const osThreadAttr_t canTxTask_attributes = {
   .name = "canTxTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for positionControlQueue */
 osMessageQueueId_t positionControlQueueHandle;
@@ -122,8 +122,15 @@ osMessageQueueId_t interCanQueueHandle;
 const osMessageQueueAttr_t interCanQueue_attributes = {
   .name = "interCanQueue"
 };
+/* Definitions for desiredPositionQueue */
+osMessageQueueId_t desiredPositionQueueHandle;
+const osMessageQueueAttr_t desiredPositionQueue_attributes = {
+  .name = "desiredPositionQueue"
+};
 /* USER CODE BEGIN PV */
-
+typedef struct {                                // object data type
+	uint16_t pos;
+} position;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -213,7 +220,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
-  GoHome();
+	GoHome();
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -233,7 +240,7 @@ int main(void)
 
   /* Create the queue(s) */
   /* creation of positionControlQueue */
-  positionControlQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &positionControlQueue_attributes);
+  positionControlQueueHandle = osMessageQueueNew (16, sizeof(position), &positionControlQueue_attributes);
 
   /* creation of positionCanQueue */
   positionCanQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &positionCanQueue_attributes);
@@ -249,6 +256,9 @@ int main(void)
 
   /* creation of interCanQueue */
   interCanQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &interCanQueue_attributes);
+
+  /* creation of desiredPositionQueue */
+  desiredPositionQueueHandle = osMessageQueueNew (16, sizeof(position), &desiredPositionQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
 	/* add queues, ... */
@@ -660,7 +670,8 @@ void GoHome(void) {
 	setPWM(htim3, forwardPWM, 255, 0);
 
 	//Espera a que el switch se presione
-	while (HAL_GPIO_ReadPin(Limit_Switch_GPIO_Port, Limit_Switch_Pin));
+	while (HAL_GPIO_ReadPin(Limit_Switch_GPIO_Port, Limit_Switch_Pin))
+		;
 
 	HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 100);
 
@@ -685,7 +696,8 @@ void GoHome(void) {
 
 }
 
-void setPWM(TIM_HandleTypeDef timer, uint32_t channel, uint16_t period, uint16_t pulse) {
+void setPWM(TIM_HandleTypeDef timer, uint32_t channel, uint16_t period,
+		uint16_t pulse) {
 	HAL_TIM_PWM_Stop(&timer, channel); // stop generation of pwm
 	TIM_OC_InitTypeDef sConfigOC;
 	timer.Init.Period = period; // set the period duration
@@ -710,8 +722,9 @@ void StartEncoderTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
 	uint8_t MSG[50] = { '\0' };
-	int32_t steps=0;
-	int16_t mm=0;
+	int32_t steps = 0;
+	int16_t mm = 0;
+	position pos;
 	uint8_t ret[4] = { '\0' };
 	//HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
 	/* Infinite loop */
@@ -721,7 +734,8 @@ void StartEncoderTask(void *argument)
 		mm = steps * 4 / 497;
 		sprintf(MSG, "Milimeters = %d\n\r    ", mm);
 		HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 100);
-		osMessageQueuePut(positionControlQueueHandle, mm, 5, 100);
+		pos.pos = mm;
+		osMessageQueuePut(positionControlQueueHandle, &pos, 5, 100);
 		osDelay(20);
 	}
   /* USER CODE END 5 */
@@ -737,23 +751,24 @@ void StartEncoderTask(void *argument)
 void StartControlTask(void *argument)
 {
   /* USER CODE BEGIN StartControlTask */
-	uint8_t desPos[4] = { "\0" };
-	uint8_t pos[4] = { "\0" };
-	uint16_t num1=0;
-	uint16_t num2=0;
+
+	uint16_t num1 = 0;
+	uint16_t num2 = 0;
+	position desPos;
+	position pos;
 	/* Infinite loop */
 	for (;;) {
 		osMessageQueueGet(positionControlQueueHandle, &pos, 5, 100);
-		osMessageQueueGet(positionCanQueueHandle, &desPos, 5, 100);
-		num1 = atoi(pos);
-		num2 = atoi(desPos);
-		if(num1>num2+1){
+		osMessageQueueGet(desiredPositionQueueHandle, &desPos, 5, 100);
+		num1 = pos.pos;
+		num2 = desPos.pos;
+		if (num1 > num2 + 1) {
 			setPWM(htim3, reversePWM, 255, 255);
 			setPWM(htim3, forwardPWM, 255, 0);
-		}else if(num1<num2-1){
+		} else if (num1 < num2 - 1) {
 			setPWM(htim3, reversePWM, 255, 0);
 			setPWM(htim3, forwardPWM, 255, 255);
-		}else{
+		} else {
 			setPWM(htim3, reversePWM, 255, 0);
 			setPWM(htim3, forwardPWM, 255, 0);
 		}
@@ -789,16 +804,17 @@ void StartDiagnosisTask(void *argument)
 void StartCanRxTask(void *argument)
 {
   /* USER CODE BEGIN StartCanRxTask */
-	uint16_t pb = {0};
+	position pushButton;
+	pushButton.pos = 0;
 	/* Infinite loop */
 
 	for (;;) {
-		if(HAL_GPIO_ReadPin(Button1_GPIO_Port, Button1_Pin)){
-			pb = 100;
-		}else if(HAL_GPIO_ReadPin(Button2_GPIO_Port, Button2_Pin)){
-			pb = 200;
+		if (HAL_GPIO_ReadPin(Button1_GPIO_Port, Button1_Pin)) {
+			pushButton.pos = 100;
+		} else if (HAL_GPIO_ReadPin(Button2_GPIO_Port, Button2_Pin)) {
+			pushButton.pos = 200;
 		}
-		osMessageQueuePut(positionCanQueueHandle, pb, 5, 100);
+		osMessageQueuePut(desiredPositionQueueHandle, &pushButton, 5, 100);
 
 		osDelay(20);
 	}

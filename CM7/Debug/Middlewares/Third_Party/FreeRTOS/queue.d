@@ -1,5 +1,5 @@
 Middlewares/Third_Party/FreeRTOS/queue.o: \
- /home/ian/Documents/Programacion/Linear_Actuator_STM32H7_IRC/Middlewares/Third_Party/FreeRTOS/Source/queue.c \
+ D:/Este\ equipo/Documentos/Programacion/Systemas\ embebidos\ avanzados/Linear_Actuator_STM32H7_IRC/Middlewares/Third_Party/FreeRTOS/Source/queue.c \
  ../../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h \
  ../Core/Inc/FreeRTOSConfig.h \
  ../../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h \
