@@ -1,0 +1,44 @@
+!SESSION 2021-11-27 14:44:29.486 -----------------------------------------------
+eclipse.buildId=Version 1.7.0
+java.version=11.0.10
+java.vendor=AdoptOpenJDK
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=es_MX
+Framework arguments:  D:\GitHubRepo\Linear_Actuator_STM32H7_IRC\.project
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 D:\GitHubRepo\Linear_Actuator_STM32H7_IRC\.project
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 4 4 2021-11-27 14:44:47.413
+!MESSAGE CubeMX plugin appears to be active, Log4j initialization might be too late.
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2021-11-27 14:44:47.461
+!MESSAGE Log4j initialized with config file D:\GitHubRepo\Linear_Actuator_STM32H7_IRC\.metadata\.log4j.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2021-11-27 14:44:51.035
+!MESSAGE Started RMI Server, listening on port 41337
+
+!ENTRY org.eclipse.core.resources 4 77 2021-11-27 14:44:51.428
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2021-11-27 14:44:51.428
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2021-11-27 14:44:51.428
+!MESSAGE D:\GitHubRepo\Linear_Actuator_STM32H7_IRC\CM4 overlaps the location of another project: 'CM4'
+
+!ENTRY org.eclipse.core.resources 4 77 2021-11-27 14:44:51.526
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2021-11-27 14:44:51.526
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2021-11-27 14:44:51.526
+!MESSAGE D:\GitHubRepo\Linear_Actuator_STM32H7_IRC\CM7 overlaps the location of another project: 'CM7'
+
+!ENTRY org.eclipse.core.resources 4 77 2021-11-27 14:45:20.172
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2021-11-27 14:45:20.172
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2021-11-27 14:45:20.172
+!MESSAGE D:\GitHubRepo\Linear_Actuator_STM32H7_IRC\CM4 overlaps the location of another project: 'CM4'
+
+!ENTRY org.eclipse.core.resources 4 77 2021-11-27 14:45:20.195
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2021-11-27 14:45:20.195
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2021-11-27 14:45:20.195
+!MESSAGE D:\GitHubRepo\Linear_Actuator_STM32H7_IRC\CM7 overlaps the location of another project: 'CM7'

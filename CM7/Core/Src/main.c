@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                             www.st.com/SLA0044
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under Ultimate Liberty license
+ * SLA0044, the "License"; You may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at:
+ *                             www.st.com/SLA0044
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -23,7 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,6 +45,10 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+ADC_HandleTypeDef hadc2;
+DMA_HandleTypeDef hdma_adc1;
+DMA_HandleTypeDef hdma_adc2;
 
 FDCAN_HandleTypeDef hfdcan1;
 
@@ -67,28 +71,28 @@ osThreadId_t controlTaskHandle;
 const osThreadAttr_t controlTask_attributes = {
   .name = "controlTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityBelowNormal,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for diagnosisTask */
 osThreadId_t diagnosisTaskHandle;
 const osThreadAttr_t diagnosisTask_attributes = {
   .name = "diagnosisTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for canRxTask */
 osThreadId_t canRxTaskHandle;
 const osThreadAttr_t canRxTask_attributes = {
   .name = "canRxTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for canTxTask */
 osThreadId_t canTxTaskHandle;
 const osThreadAttr_t canTxTask_attributes = {
   .name = "canTxTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for positionControlQueue */
 osMessageQueueId_t positionControlQueueHandle;
@@ -122,16 +126,34 @@ const osMessageQueueAttr_t interCanQueue_attributes = {
 };
 /* USER CODE BEGIN PV */
 
+
+FDCAN_RxHeaderTypeDef RxHeader;
+uint8_t RxData[8];
+FDCAN_TxHeaderTypeDef TxHeader;
+uint8_t TxData[8] = {'J', ' ', 'D', 'E', 'E', 'R', 'E', '.'};
+uint8_t TxDataInit[8] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
+uint8_t TxDataError[8] = {0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00};
+uint8_t TxDataPos[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+FDCAN_FilterTypeDef sFilterConfig;
+
+typedef struct{
+	uint16_t statusflag;
+} status;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void PeriphCommonClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_FDCAN1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
+static void MX_DMA_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_ADC2_Init(void);
 void StartEncoderTask(void *argument);
 void StartControlTask(void *argument);
 void StartDiagnosisTask(void *argument);
@@ -139,6 +161,12 @@ void StartCanRxTask(void *argument);
 void StartCanTxTask(void *argument);
 
 /* USER CODE BEGIN PFP */
+uint32_t adc_vol;
+uint32_t adc_cor;
+float current;
+float voltage;
+float maxValue;
+float minValue;
 
 /* USER CODE END PFP */
 
@@ -157,17 +185,17 @@ int main(void)
 
   /* USER CODE END 1 */
 /* USER CODE BEGIN Boot_Mode_Sequence_0 */
-  int32_t timeout;
+	int32_t timeout;
 /* USER CODE END Boot_Mode_Sequence_0 */
 
 /* USER CODE BEGIN Boot_Mode_Sequence_1 */
-  /* Wait until CPU2 boots and enters in stop mode or timeout*/
-  timeout = 0xFFFF;
-  while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) != RESET) && (timeout-- > 0));
-  if ( timeout < 0 )
-  {
-  Error_Handler();
-  }
+	/* Wait until CPU2 boots and enters in stop mode or timeout*/
+	timeout = 0xFFFF;
+	while ((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) != RESET) && (timeout-- > 0))
+		;
+	if (timeout < 0) {
+		Error_Handler();
+	}
 /* USER CODE END Boot_Mode_Sequence_1 */
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -180,22 +208,25 @@ int main(void)
 
   /* Configure the system clock */
   SystemClock_Config();
+
+/* Configure the peripherals common clocks */
+  PeriphCommonClock_Config();
 /* USER CODE BEGIN Boot_Mode_Sequence_2 */
-/* When system initialization is finished, Cortex-M7 will release Cortex-M4 by means of
-HSEM notification */
-/*HW semaphore Clock enable*/
-__HAL_RCC_HSEM_CLK_ENABLE();
-/*Take HSEM */
-HAL_HSEM_FastTake(HSEM_ID_0);
-/*Release HSEM in order to notify the CPU2(CM4)*/
-HAL_HSEM_Release(HSEM_ID_0,0);
-/* wait until CPU2 wakes up from stop mode */
-timeout = 0xFFFF;
-while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) == RESET) && (timeout-- > 0));
-if ( timeout < 0 )
-{
-Error_Handler();
-}
+	/* When system initialization is finished, Cortex-M7 will release Cortex-M4 by means of
+	 HSEM notification */
+	/*HW semaphore Clock enable*/
+	__HAL_RCC_HSEM_CLK_ENABLE();
+	/*Take HSEM */
+	HAL_HSEM_FastTake(HSEM_ID_0);
+	/*Release HSEM in order to notify the CPU2(CM4)*/
+	HAL_HSEM_Release(HSEM_ID_0, 0);
+	/* wait until CPU2 wakes up from stop mode */
+	timeout = 0xFFFF;
+	while ((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) == RESET) && (timeout-- > 0))
+		;
+	if (timeout < 0) {
+		Error_Handler();
+	}
 /* USER CODE END Boot_Mode_Sequence_2 */
 
   /* USER CODE BEGIN SysInit */
@@ -209,7 +240,25 @@ Error_Handler();
   MX_TIM3_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_DMA_Init();
+  MX_ADC1_Init();
+  MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
+
+	for(int i=0; i<2; i++){
+		HAL_GPIO_TogglePin(LD1_GPIO_Port,LD1_Pin);
+		if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxDataInit) != HAL_OK){
+			Error_Handler();
+		}
+		else{
+			HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
+		}
+		HAL_Delay(500);
+
+	}
+
+
+
 
   /* USER CODE END 2 */
 
@@ -217,15 +266,15 @@ Error_Handler();
   osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
+	/* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
+	/* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
+	/* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
   /* Create the queue(s) */
@@ -239,16 +288,16 @@ Error_Handler();
   doneQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &doneQueue_attributes);
 
   /* creation of systemDiagnosisQueue */
-  systemDiagnosisQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &systemDiagnosisQueue_attributes);
+  systemDiagnosisQueueHandle = osMessageQueueNew (16, sizeof(status), &systemDiagnosisQueue_attributes);
 
   /* creation of canDiagnosisQueue */
-  canDiagnosisQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &canDiagnosisQueue_attributes);
+  canDiagnosisQueueHandle = osMessageQueueNew (16, sizeof(status), &canDiagnosisQueue_attributes);
 
   /* creation of interCanQueue */
   interCanQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &interCanQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+	/* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -268,11 +317,11 @@ Error_Handler();
   canTxTaskHandle = osThreadNew(StartCanTxTask, NULL, &canTxTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+	/* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
+	/* add events, ... */
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
@@ -281,12 +330,11 @@ Error_Handler();
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+	while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+	}
   /* USER CODE END 3 */
 }
 
@@ -349,6 +397,154 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief Peripherals Common Clock Configuration
+  * @retval None
+  */
+void PeriphCommonClock_Config(void)
+{
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+
+  /** Initializes the peripherals clock
+  */
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+  PeriphClkInitStruct.PLL2.PLL2M = 1;
+  PeriphClkInitStruct.PLL2.PLL2N = 18;
+  PeriphClkInitStruct.PLL2.PLL2P = 4;
+  PeriphClkInitStruct.PLL2.PLL2Q = 2;
+  PeriphClkInitStruct.PLL2.PLL2R = 2;
+  PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_3;
+  PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOMEDIUM;
+  PeriphClkInitStruct.PLL2.PLL2FRACN = 6144;
+  PeriphClkInitStruct.AdcClockSelection = RCC_ADCCLKSOURCE_PLL2;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_MultiModeTypeDef multimode = {0};
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc1.Init.Resolution = ADC_RESOLUTION_16B;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DR;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.LeftBitShift = ADC_LEFTBITSHIFT_NONE;
+  hadc1.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure the ADC multi-mode
+  */
+  multimode.Mode = ADC_MODE_INDEPENDENT;
+  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  sConfig.OffsetSignedSaturation = DISABLE;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief ADC2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC2_Init(void)
+{
+
+  /* USER CODE BEGIN ADC2_Init 0 */
+
+  /* USER CODE END ADC2_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC2_Init 1 */
+
+  /* USER CODE END ADC2_Init 1 */
+  /** Common config
+  */
+  hadc2.Instance = ADC2;
+  hadc2.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc2.Init.Resolution = ADC_RESOLUTION_16B;
+  hadc2.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc2.Init.LowPowerAutoWait = DISABLE;
+  hadc2.Init.ContinuousConvMode = ENABLE;
+  hadc2.Init.NbrOfConversion = 1;
+  hadc2.Init.DiscontinuousConvMode = DISABLE;
+  hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc2.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DR;
+  hadc2.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc2.Init.LeftBitShift = ADC_LEFTBITSHIFT_NONE;
+  hadc2.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  sConfig.OffsetSignedSaturation = DISABLE;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC2_Init 2 */
+
+  /* USER CODE END ADC2_Init 2 */
+
+}
+
+/**
   * @brief FDCAN1 Initialization Function
   * @param None
   * @retval None
@@ -396,7 +592,36 @@ static void MX_FDCAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
+	/* Configure Rx filter */
+	sFilterConfig.IdType = FDCAN_STANDARD_ID;
+	sFilterConfig.FilterIndex = 0;
+	sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+	sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+	sFilterConfig.FilterID1 = 0x140;
+	sFilterConfig.FilterID2 = 0x7FF;
+	if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK)
+	{
+	  /* Filter configuration Error */
+	  Error_Handler();
+	}
 
+	 /* Start the FDCAN module */
+	if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK)
+	    /* Start Error */
+
+	if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+	    /* Notification Error */
+
+	  /* Prepare Tx Header */
+	TxHeader.IdType = FDCAN_STANDARD_ID;
+	TxHeader.Identifier = 0x140;
+	TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+	TxHeader.DataLength = FDCAN_DLC_BYTES_8;
+	TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+	TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+	TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+	TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+	TxHeader.MessageMarker = 0;
   /* USER CODE END FDCAN1_Init 2 */
 
 }
@@ -588,6 +813,25 @@ static void MX_USB_OTG_FS_PCD_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -601,14 +845,19 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11|LD2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6|GPIO_PIN_14, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -623,12 +872,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : PE11 LD2_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_11|LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PG6 PG14 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_14;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
 }
 
@@ -638,91 +894,229 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN Header_StartEncoderTask */
 /**
-  * @brief  Function implementing the readEncoderTask thread.
-  * @param  argument: Not used
-  * @retval None
-  */
+ * @brief  Function implementing the readEncoderTask thread.
+ * @param  argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartEncoderTask */
 void StartEncoderTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	/* Infinite loop */
+	for (;;) {
+		osDelay(200);
+	}
   /* USER CODE END 5 */
 }
 
 /* USER CODE BEGIN Header_StartControlTask */
 /**
-* @brief Function implementing the controlTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the controlTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartControlTask */
 void StartControlTask(void *argument)
 {
   /* USER CODE BEGIN StartControlTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	/* Infinite loop */
+	for (;;) {
+		osDelay(200);
+	}
   /* USER CODE END StartControlTask */
 }
 
 /* USER CODE BEGIN Header_StartDiagnosisTask */
 /**
-* @brief Function implementing the diagnosisTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the diagnosisTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartDiagnosisTask */
 void StartDiagnosisTask(void *argument)
 {
   /* USER CODE BEGIN StartDiagnosisTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	/* Infinite loop */
+
+	status statusMessage;
+
+	for (;;) {
+		maxValue = 2.6; //Volts
+		minValue = 0.5; //Volts
+
+		//Initialize ADC and assign variables
+		HAL_ADC_Start(&hadc1);
+		HAL_ADC_PollForConversion(&hadc1, 100);
+		adc_vol = HAL_ADC_GetValue(&hadc1);
+		HAL_ADC_Start(&hadc2);
+		HAL_ADC_PollForConversion(&hadc2, 100);
+		adc_cor = HAL_ADC_GetValue(&hadc2);
+
+		voltage = (adc_vol*3.3)/65536.0; //Volts
+		current = (adc_cor*3.3)/65536.0; //Volts
+
+			  //Conditioners
+		if((voltage > minValue && voltage < maxValue) && (current < maxValue && current > minValue))
+		{
+			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);
+		}
+		if(voltage <= minValue || voltage >= maxValue)
+		{
+			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+			if (voltage <= minValue){
+				//Under voltage
+				statusMessage.statusflag = 0x1;
+				osMessageQueuePut(canDiagnosisQueueHandle,&statusMessage, NULL, 50);
+			}
+			else{
+				//Over voltage
+				statusMessage.statusflag = 0x2;
+				osMessageQueuePut(canDiagnosisQueueHandle, &statusMessage, NULL, 50);
+			}
+		}
+		if(current >= maxValue || current <= minValue)
+		{
+			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
+			if (voltage <= minValue){
+				//Under current
+				statusMessage.statusflag = 0x3;
+				osMessageQueuePut(canDiagnosisQueueHandle, &statusMessage, NULL, 50);
+			}
+			else{
+							//Over current
+				statusMessage.statusflag = 0x4;
+				osMessageQueuePut(canDiagnosisQueueHandle, &statusMessage, NULL, 50);
+			}
+		}
+		if(voltage > minValue && voltage < maxValue)
+		{
+			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+		}
+		if(current < maxValue && current > minValue)
+		{
+
+			HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);
+		}
+
+			  //Ends ADC
+		HAL_ADC_Stop(&hadc1);
+		HAL_ADC_Stop(&hadc2);
+
+		osDelay(300);
+	}
   /* USER CODE END StartDiagnosisTask */
 }
 
 /* USER CODE BEGIN Header_StartCanRxTask */
 /**
-* @brief Function implementing the canRxTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the canRxTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartCanRxTask */
 void StartCanRxTask(void *argument)
 {
   /* USER CODE BEGIN StartCanRxTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	/* Infinite loop */
+	for (;;) {
+		/* Retrieve Rx messages from RX FIFO0 */
+		if (HAL_FDCAN_GetRxMessage(&hfdcan1, FDCAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
+		{
+			//if ((RxHeader.Identifier == 0x255) && (RxHeader.IdType == FDCAN_STANDARD_ID) && (RxHeader.DataLength == FDCAN_DLC_BYTES_8))
+			if(RxHeader.Identifier == 0x100)
+			{
+				HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
+				//RxHeader.DataLength = FDCAN_DLC_BYTES_0;
+				HAL_UART_Transmit(&huart3, RxData, 8, HAL_MAX_DELAY);
+			}
+		}
+		else
+		{
+		/* Reception Error */
+		}
+		osDelay(250);
+	}
   /* USER CODE END StartCanRxTask */
 }
 
 /* USER CODE BEGIN Header_StartCanTxTask */
 /**
-* @brief Function implementing the canTxTask thread.
-* @param argument: Not used
-* @retval None
-*/
+ * @brief Function implementing the canTxTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartCanTxTask */
 void StartCanTxTask(void *argument)
 {
   /* USER CODE BEGIN StartCanTxTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	/* Infinite loop */
+
+	osStatus_t diagnosisError;
+	osStatus_t positionGet;
+	status statusMessage;
+
+	for (;;) {
+
+		//Send diagnosis message if there is an error
+		diagnosisError = osMessageQueueGet(canDiagnosisQueueHandle, &statusMessage , NULL, 100);
+
+		if(diagnosisError == osOK){
+			TxHeader.Identifier = 0x159;
+			if(statusMessage.statusflag == 0x1){
+				TxDataError[0] = 'a';
+			}
+			else if (statusMessage.statusflag == 0x2){
+				TxDataError[0] = 'b';
+			}
+			else if (statusMessage.statusflag == 0x3){
+				TxDataError[0] = 'c';
+			}
+			else if (statusMessage.statusflag == 0x4){
+				TxDataError[0] = 'd';
+			}
+			else if (statusMessage.statusflag == 0x5){
+				TxDataError[0] = 'e';
+			}
+			if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxDataError) != HAL_OK){
+				Error_Handler();
+			}
+			else{
+				HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_11);
+			}
+		}
+
+
+		/*
+		//Send position Message
+		positionGet = osMessageQueueGet(positionCanQueueHandle, &message , NULL, 100);
+
+		if(positionGet == osOK){
+			TxHeader.Identifier = 0x140;
+			if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxData) != HAL_OK){
+				Error_Handler();
+			}
+			else{
+						//Debug message options
+				HAL_GPIO_TogglePin(GPIOG,GPIO_PIN_14);
+			}
+		}
+		 */
+
+		/*
+		if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxData) != HAL_OK){
+				  Error_Handler();
+		}
+		else{
+			HAL_GPIO_TogglePin(GPIOG,GPIO_PIN_14);
+		}
+		*/
+		osDelay(500);
+
+	}
   /* USER CODE END StartCanTxTask */
 }
 
@@ -733,11 +1127,8 @@ void StartCanTxTask(void *argument)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+
   /* USER CODE END Error_Handler_Debug */
 }
 
