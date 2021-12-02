@@ -33,6 +33,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define forwardPWM TIM_CHANNEL_3
+#define reversePWM TIM_CHANNEL_4
 
 #ifndef HSEM_ID_0
 #define HSEM_ID_0 (0U) /* HW semaphore 0*/
@@ -71,7 +73,7 @@ osThreadId_t controlTaskHandle;
 const osThreadAttr_t controlTask_attributes = {
   .name = "controlTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for diagnosisTask */
 osThreadId_t diagnosisTaskHandle;
@@ -124,6 +126,16 @@ osMessageQueueId_t interCanQueueHandle;
 const osMessageQueueAttr_t interCanQueue_attributes = {
   .name = "interCanQueue"
 };
+/* Definitions for desiredPositionQueue */
+osMessageQueueId_t desiredPositionQueueHandle;
+const osMessageQueueAttr_t desiredPositionQueue_attributes = {
+  .name = "desiredPositionQueue"
+};
+/* Definitions for controlSempahore */
+osSemaphoreId_t controlSempahoreHandle;
+const osSemaphoreAttr_t controlSempahore_attributes = {
+  .name = "controlSempahore"
+};
 /* USER CODE BEGIN PV */
 
 
@@ -135,6 +147,10 @@ uint8_t TxDataInit[8] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
 uint8_t TxDataError[8] = {0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00};
 uint8_t TxDataPos[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 FDCAN_FilterTypeDef sFilterConfig;
+
+typedef struct {                                // object data type
+	uint16_t pos;
+} position;
 
 typedef struct{
 	uint16_t statusflag;
@@ -167,6 +183,9 @@ float current;
 float voltage;
 float maxValue;
 float minValue;
+
+void GoHome(void);
+void setPWM(TIM_HandleTypeDef, uint32_t, uint16_t, uint16_t);
 
 /* USER CODE END PFP */
 
@@ -257,7 +276,7 @@ int main(void)
 
 	}
 
-
+	GoHome();
 
 
   /* USER CODE END 2 */
@@ -269,6 +288,10 @@ int main(void)
 	/* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
+  /* Create the semaphores(s) */
+  /* creation of controlSempahore */
+  controlSempahoreHandle = osSemaphoreNew(1, 1, &controlSempahore_attributes);
+
   /* USER CODE BEGIN RTOS_SEMAPHORES */
 	/* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
@@ -279,13 +302,13 @@ int main(void)
 
   /* Create the queue(s) */
   /* creation of positionControlQueue */
-  positionControlQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &positionControlQueue_attributes);
+  positionControlQueueHandle = osMessageQueueNew (16, sizeof(position), &positionControlQueue_attributes);
 
   /* creation of positionCanQueue */
-  positionCanQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &positionCanQueue_attributes);
+  positionCanQueueHandle = osMessageQueueNew (16, sizeof(position), &positionCanQueue_attributes);
 
   /* creation of doneQueue */
-  doneQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &doneQueue_attributes);
+  doneQueueHandle = osMessageQueueNew (16, sizeof(status), &doneQueue_attributes);
 
   /* creation of systemDiagnosisQueue */
   systemDiagnosisQueueHandle = osMessageQueueNew (16, sizeof(status), &systemDiagnosisQueue_attributes);
@@ -295,6 +318,9 @@ int main(void)
 
   /* creation of interCanQueue */
   interCanQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &interCanQueue_attributes);
+
+  /* creation of desiredPositionQueue */
+  desiredPositionQueueHandle = osMessageQueueNew (16, sizeof(position), &desiredPositionQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
 	/* add queues, ... */
@@ -865,6 +891,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : Limit_Switch_Pin */
+  GPIO_InitStruct.Pin = Limit_Switch_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(Limit_Switch_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pins : LD1_Pin LD3_Pin */
   GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -890,6 +922,58 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+void GoHome(void) {
+	//Deten el encoder
+	HAL_TIM_Encoder_Stop(&htim2, TIM_CHANNEL_ALL);
+
+	uint8_t MSG[50] = { '\0' };
+	sprintf(MSG, "Limit Switch pressed\n");
+
+	//Pon el motor en reversa
+	setPWM(htim3, reversePWM, 255, 255);
+	setPWM(htim3, forwardPWM, 255, 0);
+
+	//Espera a que el switch se presione
+	while (HAL_GPIO_ReadPin(Limit_Switch_GPIO_Port, Limit_Switch_Pin))
+		;
+
+	HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 100);
+
+	//Hacer que el motor se mueve en reversa 2cm
+	setPWM(htim3, reversePWM, 255, 0);
+	setPWM(htim3, forwardPWM, 255, 255);
+	int32_t steps;
+	float cm = 0;
+	HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
+	//Pon valor del encoder en 0
+	__HAL_TIM_SET_COUNTER(&htim2, 0);
+	while (cm < 2) {
+		steps = __HAL_TIM_GET_COUNTER(&htim2);
+		cm = steps * 0.4 / 497;
+		sprintf(MSG, "Centimeters = %f\n\r    ", cm);
+		HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 40);
+	}
+	//volver a poner el valor del encoder en 0
+	setPWM(htim3, reversePWM, 255, 0);
+	setPWM(htim3, forwardPWM, 255, 0);
+	__HAL_TIM_SET_COUNTER(&htim2, 0);
+
+}
+
+void setPWM(TIM_HandleTypeDef timer, uint32_t channel, uint16_t period,
+		uint16_t pulse) {
+	HAL_TIM_PWM_Stop(&timer, channel); // stop generation of pwm
+	TIM_OC_InitTypeDef sConfigOC;
+	timer.Init.Period = period; // set the period duration
+	HAL_TIM_PWM_Init(&timer); // reinititialise with new period value
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+	sConfigOC.Pulse = pulse; // set the pulse duration
+	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+	HAL_TIM_PWM_ConfigChannel(&timer, &sConfigOC, channel);
+	HAL_TIM_PWM_Start(&timer, channel); // start pwm generation
+}
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartEncoderTask */
@@ -902,9 +986,21 @@ static void MX_GPIO_Init(void)
 void StartEncoderTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
+	uint8_t MSG[50] = { '\0' };
+	int32_t steps = 0;
+	int16_t mm = 0;
+	position pos;
+	uint8_t ret[4] = { '\0' };
 	/* Infinite loop */
 	for (;;) {
-		osDelay(200);
+		steps = __HAL_TIM_GET_COUNTER(&htim2);
+		mm = steps * 4 / 497;
+		//sprintf(MSG, "Milimeters = %d\n\r    ", mm);
+		//HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 50);
+		pos.pos = mm;
+		osMessageQueuePut(positionControlQueueHandle, &pos, NULL, 10);
+		osMessageQueuePut(positionCanQueueHandle, &pos, NULL, 10);
+		osDelay(100);
 	}
   /* USER CODE END 5 */
 }
@@ -919,9 +1015,39 @@ void StartEncoderTask(void *argument)
 void StartControlTask(void *argument)
 {
   /* USER CODE BEGIN StartControlTask */
+	uint16_t num1 = 0;
+	uint16_t num2 = 0;
+	position desPos;
+	position pos;
+	status statu;
+	statu.statusflag = 0x00;
+	uint8_t MSG[50] = { '\0' };
+
+	osStatus_t estado;
 	/* Infinite loop */
 	for (;;) {
-		osDelay(200);
+		estado = osMessageQueueGet(systemDiagnosisQueueHandle, &statu, NULL, 10);
+		if(statu.statusflag != 0x00 ){
+			setPWM(htim3, reversePWM, 255, 0);
+			setPWM(htim3, forwardPWM, 255, 0);
+		}
+		else{
+			osMessageQueueGet(positionControlQueueHandle, &pos, NULL, 10);
+			osMessageQueueGet(desiredPositionQueueHandle, &desPos, NULL, 10);
+			num1 = pos.pos;
+			num2 = desPos.pos;
+			if (num1 > num2 + 2) {
+				setPWM(htim3, reversePWM, 255, 255);
+				setPWM(htim3, forwardPWM, 255, 0);
+			} else if (num1 < num2 - 2) {
+				setPWM(htim3, reversePWM, 255, 0);
+				setPWM(htim3, forwardPWM, 255, 255);
+			} else {
+				setPWM(htim3, reversePWM, 255, 0);
+				setPWM(htim3, forwardPWM, 255, 0);
+			}
+		}
+		osDelay(50);
 	}
   /* USER CODE END StartControlTask */
 }
@@ -961,6 +1087,7 @@ void StartDiagnosisTask(void *argument)
 			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
 			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 			HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);
+			statusMessage.statusflag = 0x0;
 		}
 		if(voltage <= minValue || voltage >= maxValue)
 		{
@@ -969,13 +1096,13 @@ void StartDiagnosisTask(void *argument)
 			if (voltage <= minValue){
 				//Under voltage
 				statusMessage.statusflag = 0x1;
-				osMessageQueuePut(canDiagnosisQueueHandle,&statusMessage, NULL, 50);
 			}
 			else{
 				//Over voltage
 				statusMessage.statusflag = 0x2;
-				osMessageQueuePut(canDiagnosisQueueHandle, &statusMessage, NULL, 50);
+
 			}
+			osMessageQueuePut(canDiagnosisQueueHandle, &statusMessage, NULL, 10);
 		}
 		if(current >= maxValue || current <= minValue)
 		{
@@ -984,14 +1111,16 @@ void StartDiagnosisTask(void *argument)
 			if (current <= minValue){
 				//Under current
 				statusMessage.statusflag = 0x3;
-				osMessageQueuePut(canDiagnosisQueueHandle, &statusMessage, NULL, 50);
 			}
 			else{
 							//Over current
 				statusMessage.statusflag = 0x4;
-				osMessageQueuePut(canDiagnosisQueueHandle, &statusMessage, NULL, 50);
 			}
+			osMessageQueuePut(canDiagnosisQueueHandle, &statusMessage, NULL, 10);
 		}
+
+		osMessageQueuePut(systemDiagnosisQueueHandle,&statusMessage, NULL, 10);
+
 		if(voltage > minValue && voltage < maxValue)
 		{
 			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
@@ -1006,7 +1135,7 @@ void StartDiagnosisTask(void *argument)
 		HAL_ADC_Stop(&hadc1);
 		HAL_ADC_Stop(&hadc2);
 
-		osDelay(300);
+		osDelay(400);
 	}
   /* USER CODE END StartDiagnosisTask */
 }
@@ -1022,23 +1151,27 @@ void StartCanRxTask(void *argument)
 {
   /* USER CODE BEGIN StartCanRxTask */
 	/* Infinite loop */
+	position post;
+	post.pos = 0;
+	osStatus_t msgStatus;
 	for (;;) {
 		/* Retrieve Rx messages from RX FIFO0 */
 		if (HAL_FDCAN_GetRxMessage(&hfdcan1, FDCAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
 		{
 			//if ((RxHeader.Identifier == 0x255) && (RxHeader.IdType == FDCAN_STANDARD_ID) && (RxHeader.DataLength == FDCAN_DLC_BYTES_8))
-			if(RxHeader.Identifier == 0x100)
+			if(RxHeader.Identifier == 0x101)
 			{
 				HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
 				//RxHeader.DataLength = FDCAN_DLC_BYTES_0;
-				HAL_UART_Transmit(&huart3, RxData, 8, HAL_MAX_DELAY);
+				post.pos = (uint16_t) RxData[7];
 			}
 		}
 		else
 		{
 		/* Reception Error */
 		}
-		osDelay(250);
+		msgStatus = osMessageQueuePut(desiredPositionQueueHandle, &post, NULL, 10);
+		osDelay(300);
 	}
   /* USER CODE END StartCanRxTask */
 }
@@ -1058,11 +1191,12 @@ void StartCanTxTask(void *argument)
 	osStatus_t diagnosisError;
 	osStatus_t positionGet;
 	status statusMessage;
+	position post;
 
 	for (;;) {
 
 		//Send diagnosis message if there is an error
-		diagnosisError = osMessageQueueGet(canDiagnosisQueueHandle, &statusMessage , NULL, 100);
+		diagnosisError = osMessageQueueGet(canDiagnosisQueueHandle, &statusMessage , NULL, 10);
 
 		if(diagnosisError == osOK){
 			TxHeader.Identifier = 0x159;
@@ -1090,21 +1224,26 @@ void StartCanTxTask(void *argument)
 		}
 
 
-		/*
-		//Send position Message
-		positionGet = osMessageQueueGet(positionCanQueueHandle, &message , NULL, 100);
 
-		if(positionGet == osOK){
-			TxHeader.Identifier = 0x140;
-			if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxData) != HAL_OK){
-				Error_Handler();
-			}
-			else{
-						//Debug message options
-				HAL_GPIO_TogglePin(GPIOG,GPIO_PIN_14);
+		//Send position Message
+		if(osMessageQueueGetSpace(positionCanQueueHandle) == 0){
+			osMessageQueueReset(positionCanQueueHandle);
+		}
+		else{
+			positionGet = osMessageQueueGet(positionCanQueueHandle, &post, NULL, 10);
+
+			if(positionGet == osOK){
+				TxHeader.Identifier = 0x140;
+				TxDataPos[7] = (uint8_t) post.pos;
+				if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxDataPos) != HAL_OK){
+					Error_Handler();
+				}
+				else{
+							//Debug message options
+					HAL_GPIO_TogglePin(GPIOG,GPIO_PIN_14);
+				}
 			}
 		}
-		 */
 
 		/*
 		if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxData) != HAL_OK){
@@ -1114,7 +1253,7 @@ void StartCanTxTask(void *argument)
 			HAL_GPIO_TogglePin(GPIOG,GPIO_PIN_14);
 		}
 		*/
-		osDelay(500);
+		osDelay(350);
 
 	}
   /* USER CODE END StartCanTxTask */
