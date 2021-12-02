@@ -2685,8 +2685,8 @@ void StartDiagnosisTask(void *argument)
  8001426:	f44f 4180 	mov.w	r1, #16384	; 0x4000
  800142a:	4840      	ldr	r0, [pc, #256]	; (800152c <StartDiagnosisTask+0x2cc>)
  800142c:	f005 fe98 	bl	8007160 <HAL_GPIO_WritePin>
-			if (voltage <= minValue){
- 8001430:	4b3c      	ldr	r3, [pc, #240]	; (8001524 <StartDiagnosisTask+0x2c4>)
+			if (current <= minValue){
+ 8001430:	4b3d      	ldr	r3, [pc, #244]	; (8001528 <StartDiagnosisTask+0x2c8>)
  8001432:	ed93 7a00 	vldr	s14, [r3]
  8001436:	4b36      	ldr	r3, [pc, #216]	; (8001510 <StartDiagnosisTask+0x2b0>)
  8001438:	edd3 7a00 	vldr	s15, [r3]

@@ -981,7 +981,7 @@ void StartDiagnosisTask(void *argument)
 		{
 			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
 			HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
-			if (voltage <= minValue){
+			if (current <= minValue){
 				//Under current
 				statusMessage.statusflag = 0x3;
 				osMessageQueuePut(canDiagnosisQueueHandle, &statusMessage, NULL, 50);
