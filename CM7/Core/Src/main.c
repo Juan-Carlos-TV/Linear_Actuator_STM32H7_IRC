@@ -121,11 +121,6 @@ osMessageQueueId_t canDiagnosisQueueHandle;
 const osMessageQueueAttr_t canDiagnosisQueue_attributes = {
   .name = "canDiagnosisQueue"
 };
-/* Definitions for interCanQueue */
-osMessageQueueId_t interCanQueueHandle;
-const osMessageQueueAttr_t interCanQueue_attributes = {
-  .name = "interCanQueue"
-};
 /* Definitions for desiredPositionQueue */
 osMessageQueueId_t desiredPositionQueueHandle;
 const osMessageQueueAttr_t desiredPositionQueue_attributes = {
@@ -315,9 +310,6 @@ int main(void)
 
   /* creation of canDiagnosisQueue */
   canDiagnosisQueueHandle = osMessageQueueNew (16, sizeof(status), &canDiagnosisQueue_attributes);
-
-  /* creation of interCanQueue */
-  interCanQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &interCanQueue_attributes);
 
   /* creation of desiredPositionQueue */
   desiredPositionQueueHandle = osMessageQueueNew (16, sizeof(position), &desiredPositionQueue_attributes);
@@ -1158,7 +1150,7 @@ void StartCanRxTask(void *argument)
 		/* Retrieve Rx messages from RX FIFO0 */
 		if (HAL_FDCAN_GetRxMessage(&hfdcan1, FDCAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
 		{
-			//if ((RxHeader.Identifier == 0x255) && (RxHeader.IdType == FDCAN_STANDARD_ID) && (RxHeader.DataLength == FDCAN_DLC_BYTES_8))
+
 			if(RxHeader.Identifier == 0x101)
 			{
 				HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
@@ -1245,14 +1237,6 @@ void StartCanTxTask(void *argument)
 			}
 		}
 
-		/*
-		if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxData) != HAL_OK){
-				  Error_Handler();
-		}
-		else{
-			HAL_GPIO_TogglePin(GPIOG,GPIO_PIN_14);
-		}
-		*/
 		osDelay(350);
 
 	}
