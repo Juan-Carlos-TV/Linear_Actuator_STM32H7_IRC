@@ -66,8 +66,50 @@ In our case, 7 ppr were enough to get a total number of 497 pulses. Very presice
 <ul>
   <li>Common limit switch for calibration propourses: at the initialization we will rotate backwards until the switch goes high and then we are going to rotate forward until initial position.
   <li>Two potentiometers in order to simulate the output voltage of current and voltage sensors
-    
+  <li>Cylinder (piston): designed by us. It is kind of difficult to find the right desing of piston that fits your requirements. In our case were we needed to reach at least 20 cm of lenght and decided to use an endless screw connected to the motor shaft which made the mecanism to advance due to rotation. This desing consist in the base of the actuator that involver the cylinder like a telescope, the cylinder itself and the joint between screw and shaft
 </ul>
 
+<div align="center"><img src="https://i.imgur.com/GQ9rlD4.png" width="auto" height="200" /></div>
+<div align="center"><img src="https://i.imgur.com/MqLbz01.png" width="auto" height="200" /></div>
+
+On this desing, the limit switch is attached ad 22 cm behind of the edge of the base. So in our code, after the limit switch goes to up, we will move the piston 2cm forward to start in 0.
+
 ## Scheme
+
+<img src="https://i.imgur.com/o9bDSw0.png" />
+
+As mentioned before, one the mcp2515 module were modified to only use the CAN Transciver and not the SPI-CAN converter in order to use the inbuild FDCAN peripherial on the STM32. The change was made solding the CAN TX and RX of the transciver to jumper wires which were connected to the corresponding pins on the board.
+
+The other module is connected via SPI to the ESP32, but since this board has an inbuild CAN peripherial, you can try using it. Also, we recommend using jumpers to conect J1 ping on the module. This will add the 120 Ohm resistence recommend for CAN communication.
+
+Limit switch pin is configured as pull down so we will only conect the input to 3.3 V and the other to input pin on the boad.
+
+Supply of BTS7960 is 3.3V and GND. Also the enable pins are conected to VCC because we want PWM of both directions to be alway available.
+
+Maybe one mistake on this project was using the default pin asingnation instead of modify it to be a little bit more ordered.
+
 ## Considerations!
+
+### STM32 CUBE IDE Project
+The project was initialized on default mode of the board so this actomatically asings the STLink Pins and peripherials as the user leds, USART 3, the USB OTG, the ethernet and the RCC. Some of them were deassigned.
+
+The clock configuration was adjusted in order to make the FDCAN work at 40 MHz to achieve a 1000 Kbps CAN Communication. The adc work at 37.5 MHz, USB to 50 MHz, and SYSCLK to 80 MHz.
+
+The USART is only used for debugging purposes so it can be removed for final project.
+
+Extra pins were assigned for debbuing purposes using LEDs. This parts are now commented but pins are still assigned.
+
+The CMSIS (the api where is running the OS) version used in this projects is <a href="https://arm-software.github.io/CMSIS_5/RTOS2/html/rtos_api2.html">V2</a>.
+
+### CAN COMUNICATION
+
+To achieve the CAN communication with the ESP32 we are using the <a href="https://github.com/coryjfowler/MCP_CAN_lib">coryjfowler CAN-Master library</a>. On the ESP32 CAN is initialized at a BAUDRATE of 1000 Kbps and the clock frequency depends on your module
+
+In other to use this library in arduion IoT applications you will use the next .zip 
+[mcp_can.zip](https://github.com/Juan-Carlos-TV/Linear_Actuator_STM32H7_IRC/files/7799891/mcp_can.zip)
+.This is because libraries in this environment has some special specifications that traditional arduino libraries doesn't
+
+CAN messages follow the netx logic:
+
+<div align="center"><img src="https://i.imgur.com/flRQiKK.png" width="auto" height="400" /></div>
+
