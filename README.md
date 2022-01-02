@@ -113,3 +113,10 @@ CAN messages follow the netx logic:
 
 <div align="center"><img src="https://i.imgur.com/flRQiKK.png" width="auto" height="400" /></div>
 
+### CONTROL
+
+The control task uses a Fuzzylogic Control which consist only on max and min PWM. PID control is another possibility but we thought it wasn't neccesary because the speed of the system and the non-existing overdraft in our tests. For PID control maybe the P is the only constant needed because of the nature of the system.
+
+
+
+
