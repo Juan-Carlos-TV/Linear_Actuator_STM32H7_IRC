@@ -950,7 +950,7 @@ void GoHome(void) {
 	__HAL_TIM_SET_COUNTER(&htim2, 0);
 	while (cm < 2) {
 		steps = __HAL_TIM_GET_COUNTER(&htim2);
-		cm = (float) steps * (conv/10) / ppr;
+		cm = (float) steps * (conv/10.0) / ppr;
 		sprintf(MSG, "Centimeters = %f\n\r    ", cm);
 		HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 40);
 	}
