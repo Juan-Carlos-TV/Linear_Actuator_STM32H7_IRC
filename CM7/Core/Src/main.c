@@ -133,7 +133,7 @@ const osSemaphoreAttr_t controlSempahore_attributes = {
 };
 /* USER CODE BEGIN PV */
 
-
+//FDCAN variables
 FDCAN_RxHeaderTypeDef RxHeader;
 uint8_t RxData[8];
 FDCAN_TxHeaderTypeDef TxHeader;
@@ -142,6 +142,21 @@ uint8_t TxDataInit[8] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
 uint8_t TxDataError[8] = {0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00};
 uint8_t TxDataPos[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 FDCAN_FilterTypeDef sFilterConfig;
+
+//ADC reeding variables
+uint32_t adc_vol;
+uint32_t adc_cor;
+float current;
+float voltage;
+float maxValue;
+float minValue;
+
+//Encoder reeding variables
+//Conv is the distance per rotation (in mm) of the arrow dividen by 2
+//This is because the encoder mode is couting 2 by one step
+uint16_t conv = 4;
+//ppr is the number of steps to complete one revolution with the reduction
+uint16_t ppr = 497;
 
 typedef struct {                                // object data type
 	uint16_t pos;
@@ -172,12 +187,6 @@ void StartCanRxTask(void *argument);
 void StartCanTxTask(void *argument);
 
 /* USER CODE BEGIN PFP */
-uint32_t adc_vol;
-uint32_t adc_cor;
-float current;
-float voltage;
-float maxValue;
-float minValue;
 
 void GoHome(void);
 void setPWM(TIM_HandleTypeDef, uint32_t, uint16_t, uint16_t);
@@ -915,37 +924,37 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 void GoHome(void) {
-	//Deten el encoder
+	//Stop Encoder
 	HAL_TIM_Encoder_Stop(&htim2, TIM_CHANNEL_ALL);
 
 	uint8_t MSG[50] = { '\0' };
 	sprintf(MSG, "Limit Switch pressed\n");
 
-	//Pon el motor en reversa
+	//Move motor backwards
 	setPWM(htim3, reversePWM, 255, 255);
 	setPWM(htim3, forwardPWM, 255, 0);
 
-	//Espera a que el switch se presione
+	//Wait until limit switch is pressed
 	while (HAL_GPIO_ReadPin(Limit_Switch_GPIO_Port, Limit_Switch_Pin))
 		;
 
 	HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 100);
 
-	//Hacer que el motor se mueve en reversa 2cm
+	//Move the actuator 2 cm forward
 	setPWM(htim3, reversePWM, 255, 0);
 	setPWM(htim3, forwardPWM, 255, 255);
 	int32_t steps;
 	float cm = 0;
 	HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
-	//Pon valor del encoder en 0
+	//Set encoder to 0
 	__HAL_TIM_SET_COUNTER(&htim2, 0);
 	while (cm < 2) {
 		steps = __HAL_TIM_GET_COUNTER(&htim2);
-		cm = steps * 0.4 / 497;
+		cm = (float) steps * (conv/10) / ppr;
 		sprintf(MSG, "Centimeters = %f\n\r    ", cm);
 		HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 40);
 	}
-	//volver a poner el valor del encoder en 0
+	//set pwm to 0 and encoder to 0
 	setPWM(htim3, reversePWM, 255, 0);
 	setPWM(htim3, forwardPWM, 255, 0);
 	__HAL_TIM_SET_COUNTER(&htim2, 0);
@@ -983,10 +992,11 @@ void StartEncoderTask(void *argument)
 	int16_t mm = 0;
 	position pos;
 	uint8_t ret[4] = { '\0' };
+
 	/* Infinite loop */
 	for (;;) {
 		steps = __HAL_TIM_GET_COUNTER(&htim2);
-		mm = steps * 4 / 497;
+		mm = steps * conv / ppr;
 		//sprintf(MSG, "Milimeters = %d\n\r    ", mm);
 		//HAL_UART_Transmit(&huart3, MSG, sizeof(MSG), 50);
 		pos.pos = mm;
@@ -1153,7 +1163,7 @@ void StartCanRxTask(void *argument)
 
 			if(RxHeader.Identifier == 0x101)
 			{
-				HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
+				//HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_6);
 				//RxHeader.DataLength = FDCAN_DLC_BYTES_0;
 				post.pos = (uint16_t) RxData[7];
 			}
@@ -1211,7 +1221,7 @@ void StartCanTxTask(void *argument)
 				Error_Handler();
 			}
 			else{
-				HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_11);
+				//HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_11);
 			}
 		}
 
@@ -1232,7 +1242,7 @@ void StartCanTxTask(void *argument)
 				}
 				else{
 							//Debug message options
-					HAL_GPIO_TogglePin(GPIOG,GPIO_PIN_14);
+					//HAL_GPIO_TogglePin(GPIOG,GPIO_PIN_14);
 				}
 			}
 		}
