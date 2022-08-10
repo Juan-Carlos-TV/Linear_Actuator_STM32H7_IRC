@@ -36,7 +36,7 @@ These are the main components we used for our implementation:
     
 <img src="https://media.naylampmechatronics.com/1053-superlarge_default/modulo-can-mcp2515.jpg" width="auto" height="250" />
     
-**NOTE:** We made this modification because the team were not able to get a common CAN Transciver in time, but any of them should work. One of the most common is the MCP2551 which has its own module.
+**NOTE:** We made this modification because the we were not able to get a common CAN Transciver in time, but any of them should work. One of the most common is the MCP2551 which has its own module.
 
 <img src="https://electronilab.co/wp-content/uploads/2021/06/Modulo-CAN-Bus-MCP2551-1.jpg" width="auto" height="250" />
 
